@@ -107,6 +107,8 @@ Symulacja automatycznie zapisuje dane populacji do pliku CSV po zamknięciu prog
 
 Można też zapisać dane ręcznie klawiszem **S** podczas symulacji.
 
+## Obserwacje z symulacji
+
 1. **Cykle populacyjne** - populacje oscylują w naturalnych cyklach
 2. **Konkurencja o zasoby** - króliki konkurują o trawę
 3. **Relacje drapieżnik-ofiara** - lisy kontrolują populację królików
@@ -133,7 +135,3 @@ Projekt przeszedł przez następujące etapy:
 - Choroby i epidemie
 - Migracje zwierząt
 - Interfejs użytkownika do zmiany parametrów w czasie rzeczywistym
-
-## Autor
-
-Projekt wykonany zgodnie z wymaganiami kursu grafiki komputerowej.

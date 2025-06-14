@@ -2,13 +2,11 @@ package main
 
 import "math/rand"
 
-// Grass represents grass at a position
 type Grass struct {
 	Position
 	Amount int // 0-100, where 100 is fully grown
 }
 
-// updateGrass handles grass growth and spawning
 func (w *World) updateGrass() {
 	// Grow existing grass
 	for _, grass := range w.Grass {
@@ -25,14 +23,12 @@ func (w *World) updateGrass() {
 		x := rand.Intn(gridWidth)
 		y := rand.Intn(gridHeight)
 		
-		// Check if cell is empty
 		if w.Grid[x][y] == Empty {
-			// Random chance to spawn grass
 			if rand.Float64() < grassSpawnChance {
 				pos := Position{x, y}
 				w.Grass[pos] = &Grass{
 					Position: pos,
-					Amount:   grassGrowthRate, // Start with small amount
+					Amount:   grassGrowthRate,
 				}
 				w.Grid[x][y] = GrassType
 			}
