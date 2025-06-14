@@ -27,6 +27,6 @@ go build -ldflags="-s -w" -o ecosystem-sim-optimized main.go
 
 - [x] Setup projektu
 - [x] Podstawowe okno gry
-- [ ] System świata i entity
+- [x] System świata i entity
 - [ ] Renderowanie
 - [ ] Logika symulacji
