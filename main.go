@@ -24,10 +24,15 @@ const (
 	grassSpawnChance  = 0.01 // Chance for new grass to appear on empty cells
 	
 	// Rabbit parameters
-	rabbitMoveChance = 0.5   // Chance rabbit moves each tick (zwiększone - szybsze poszukiwanie)
+	rabbitMoveChance = 0.7   // Chance rabbit moves each tick (zwiększone z 0.5)
 	rabbitEnergyLoss = 1     // Energy lost per tick every 60 ticks (co sekundę)
 	grassEnergyGain  = 40    // Energy gained from eating grass (dużo więcej)
 	minGrassToEat    = 5     // Minimum grass amount to be edible (bardzo niskie)
+	
+	// Reproduction parameters
+	reproduceEnergyThreshold = 60  // Min energy to reproduce (zmniejszone z 70)
+	reproductionCooldown     = 180 // Ticks before can reproduce again (3 seconds zamiast 5)
+	reproduceChance          = 0.3 // Chance to try reproduction each tick (zwiększone z 0.1)
 )
 
 // Entity types
@@ -57,6 +62,7 @@ type Rabbit struct {
 	Energy       int
 	ReproduceCD  int // Cooldown after reproduction
 	Age          int
+	NewBorn      int // Ticks since birth (for visual indication)
 }
 
 // Fox represents a fox entity
@@ -134,11 +140,20 @@ func (w *World) updateGrass() {
 
 // updateRabbits handles rabbit movement and aging
 func (w *World) updateRabbits() {
+	// First, handle all rabbit updates without reproduction
 	for i := len(w.Rabbits) - 1; i >= 0; i-- {
 		rabbit := w.Rabbits[i]
 		
-		// Age
+		// Age and reduce reproduction cooldown
 		rabbit.Age++
+		if rabbit.ReproduceCD > 0 {
+			rabbit.ReproduceCD--
+		}
+		
+		// Reduce newborn indicator
+		if rabbit.NewBorn > 0 {
+			rabbit.NewBorn--
+		}
 		
 		// Lose energy only every 60 ticks (roughly once per second)
 		if w.Tick%60 == 0 {
@@ -158,6 +173,104 @@ func (w *World) updateRabbits() {
 		// Check if rabbit dies
 		if rabbit.Energy <= 0 {
 			w.removeRabbit(i)
+		}
+	}
+	
+	// Then handle reproduction in separate pass to avoid multiple births per tick
+	w.handleRabbitReproduction()
+}
+
+// handleRabbitReproduction handles all rabbit reproduction in one pass
+func (w *World) handleRabbitReproduction() {
+	processedPairs := make(map[string]bool) // Track processed rabbit pairs
+	
+	for _, rabbit := range w.Rabbits {
+		// Skip if this rabbit can't reproduce
+		if rabbit.Energy < reproduceEnergyThreshold || rabbit.ReproduceCD > 0 {
+			continue
+		}
+		
+		// Skip reproduction attempt with some probability
+		if rand.Float64() >= reproduceChance {
+			continue
+		}
+		
+		// Look for adjacent partner
+		partner := w.findAdjacentReproductivePartner(rabbit, processedPairs)
+		if partner != nil {
+			// Mark this pair as processed (both directions)
+			pairKey1 := fmt.Sprintf("%d,%d-%d,%d", rabbit.Position.X, rabbit.Position.Y, partner.Position.X, partner.Position.Y)
+			pairKey2 := fmt.Sprintf("%d,%d-%d,%d", partner.Position.X, partner.Position.Y, rabbit.Position.X, rabbit.Position.Y)
+			processedPairs[pairKey1] = true
+			processedPairs[pairKey2] = true
+			
+			// Create baby
+			w.createBabyRabbit(rabbit, partner)
+		}
+	}
+}
+
+// findAdjacentReproductivePartner finds a suitable partner for reproduction
+func (w *World) findAdjacentReproductivePartner(rabbit *Rabbit, processedPairs map[string]bool) *Rabbit {
+	adjacentPositions := w.getAdjacentPositions(rabbit.Position)
+	
+	for _, pos := range adjacentPositions {
+		if w.Grid[pos.X][pos.Y] == RabbitType {
+			partner := w.findRabbitAtPosition(pos)
+			if partner != nil && 
+			   partner.Energy >= reproduceEnergyThreshold && 
+			   partner.ReproduceCD == 0 {
+				
+				// Check if this pair was already processed this tick
+				pairKey := fmt.Sprintf("%d,%d-%d,%d", rabbit.Position.X, rabbit.Position.Y, partner.Position.X, partner.Position.Y)
+				if !processedPairs[pairKey] {
+					return partner
+				}
+			}
+		}
+	}
+	return nil
+}
+
+// findRabbitAtPosition finds rabbit at given position
+func (w *World) findRabbitAtPosition(pos Position) *Rabbit {
+	for _, rabbit := range w.Rabbits {
+		if rabbit.Position.X == pos.X && rabbit.Position.Y == pos.Y {
+			return rabbit
+		}
+	}
+	return nil
+}
+
+// createBabyRabbit creates new rabbit from two parents
+func (w *World) createBabyRabbit(parent1, parent2 *Rabbit) {
+	// Find empty adjacent position for baby
+	adjacentPositions := w.getAdjacentPositions(parent1.Position)
+	
+	for _, pos := range adjacentPositions {
+		if w.Grid[pos.X][pos.Y] == Empty {
+			// Create baby rabbit
+			baby := &Rabbit{
+				Position:    pos,
+				Energy:      60, // Born with decent energy
+				ReproduceCD: reproductionCooldown, // Can't reproduce immediately
+				Age:         0,
+				NewBorn:     180, // Visual indicator for 30 seconds (180 ticks at 6 FPS)
+			}
+			
+			w.Rabbits = append(w.Rabbits, baby)
+			w.Grid[pos.X][pos.Y] = RabbitType
+			
+			// Parents lose energy and get cooldown
+			parent1.Energy -= 20
+			parent2.Energy -= 20
+			parent1.ReproduceCD = reproductionCooldown
+			parent2.ReproduceCD = reproductionCooldown
+			
+			// Log birth for visibility
+			log.Printf("New rabbit born at (%d,%d)! Total rabbits: %d", pos.X, pos.Y, len(w.Rabbits))
+			
+			return
 		}
 	}
 }
@@ -246,6 +359,8 @@ func (w *World) removeRabbit(index int) {
 // Game represents the main game state
 type Game struct {
 	world *World
+	slowMode bool  // Slower simulation
+	tickCounter int // Count frames to slow down updates
 }
 
 // Update proceeds the game state.
@@ -260,9 +375,14 @@ func (g *Game) Update() error {
 		log.Println("World initialized with test entities")
 	}
 	
-	// Update world every tick
-	g.world.Update()
-	g.world.Tick++
+	// Slow down simulation - update world only every 10 frames (6 FPS instead of 60)
+	g.tickCounter++
+	if g.tickCounter >= 10 {
+		g.tickCounter = 0
+		g.world.Update()
+		g.world.Tick++
+	}
+	
 	return nil
 }
 
@@ -281,22 +401,30 @@ func (g *Game) addTestEntities() {
 		g.world.Grid[x][y] = GrassType
 	}
 	
-	// Add some rabbits
-	for i := 0; i < 5; i++ {
-		x := rand.Intn(gridWidth)
-		y := rand.Intn(gridHeight)
+	// Add some rabbits (w grupach żeby się częściej spotykały)
+	for group := 0; group < 3; group++ {
+		// Random center for group
+		centerX := rand.Intn(gridWidth-10) + 5
+		centerY := rand.Intn(gridHeight-10) + 5
 		
-		// Make sure position is not occupied
-		if g.world.Grid[x][y] == Empty {
-			rabbit := &Rabbit{
-				Position: Position{x, y},
-				Energy:   80, // Start with more energy
-				ReproduceCD: 0,
-				Age:      0,
-			}
+		// Add 3-4 rabbits around this center
+		for i := 0; i < 3+rand.Intn(2); i++ {
+			x := centerX + rand.Intn(6) - 3 // Within 3 cells of center
+			y := centerY + rand.Intn(6) - 3
 			
-			g.world.Rabbits = append(g.world.Rabbits, rabbit)
-			g.world.Grid[x][y] = RabbitType
+			// Make sure within bounds and not occupied
+			if x >= 0 && x < gridWidth && y >= 0 && y < gridHeight && g.world.Grid[x][y] == Empty {
+				rabbit := &Rabbit{
+					Position: Position{x, y},
+					Energy:   80, // Start with more energy
+					ReproduceCD: 0,
+					Age:      0,
+					NewBorn:  0, // Not newborn
+				}
+				
+				g.world.Rabbits = append(g.world.Rabbits, rabbit)
+				g.world.Grid[x][y] = RabbitType
+			}
 		}
 	}
 	
@@ -338,14 +466,19 @@ func (g *Game) Draw(screen *ebiten.Image) {
 		debugText += fmt.Sprintf("Rabbits: %d\n", len(g.world.Rabbits))
 		debugText += fmt.Sprintf("Foxes: %d\n", len(g.world.Foxes))
 		
-		// Show average rabbit energy
+		// Show rabbit reproduction status
 		if len(g.world.Rabbits) > 0 {
+			readyToReproduce := 0
 			totalEnergy := 0
 			for _, r := range g.world.Rabbits {
 				totalEnergy += r.Energy
+				if r.Energy >= reproduceEnergyThreshold && r.ReproduceCD == 0 {
+					readyToReproduce++
+				}
 			}
 			avgEnergy := totalEnergy / len(g.world.Rabbits)
-			debugText += fmt.Sprintf("Avg Rabbit Energy: %d", avgEnergy)
+			debugText += fmt.Sprintf("Avg Energy: %d\n", avgEnergy)
+			debugText += fmt.Sprintf("Ready to breed: %d", readyToReproduce)
 		}
 	}
 	
@@ -387,7 +520,24 @@ func (g *Game) drawRabbit(screen *ebiten.Image, pos Position) {
 	x := pos.X * cellSize
 	y := pos.Y * cellSize
 	
-	rabbitColor := color.RGBA{255, 255, 255, 255} // White
+	// Find the rabbit at this position to check if it's newborn
+	var rabbit *Rabbit
+	for _, r := range g.world.Rabbits {
+		if r.Position.X == pos.X && r.Position.Y == pos.Y {
+			rabbit = r
+			break
+		}
+	}
+	
+	var rabbitColor color.RGBA
+	if rabbit != nil && rabbit.NewBorn > 0 {
+		// Newborn rabbits are yellow for visibility
+		rabbitColor = color.RGBA{255, 255, 0, 255} // Yellow
+	} else {
+		// Normal rabbits are white
+		rabbitColor = color.RGBA{255, 255, 255, 255} // White
+	}
+	
 	// Smaller rabbit so we can see grass underneath
 	g.fillRect(screen, x+3, y+3, cellSize-6, cellSize-6, rabbitColor)
 }
