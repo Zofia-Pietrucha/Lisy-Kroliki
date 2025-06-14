@@ -7,6 +7,7 @@ import (
 	"image/color"
 	"log"
 	"math/rand"
+	"strings"
 	"time"
 
 	"github.com/hajimehoshi/ebiten/v2"
@@ -22,6 +23,10 @@ type Game struct {
 	paused          bool // Simulation pause state
 	populationHistory []PopulationData // Historical population data for graphing
 	recordCounter   int  // Counter for recording data points
+	
+	// Drawing modes
+	drawMode        string // "none", "rabbit", "fox"
+	mousePressed    bool   // Track if mouse is being held down
 }
 
 // Update proceeds the game state.
@@ -38,7 +43,11 @@ func (g *Game) Update() error {
 		g.populationHistory = make([]PopulationData, 0, maxHistoryPoints)
 		g.recordPopulationData()
 		
+		// Initialize drawing mode
+		g.drawMode = "none"
+		
 		log.Println("World initialized with test entities")
+		log.Println("Use keys: 1=Draw Rabbits, 2=Draw Foxes, 0=Normal mode")
 	}
 	
 	// Handle input
@@ -78,10 +87,113 @@ func (g *Game) handleInput() {
 		}
 	}
 	
+	// Number keys to change drawing mode
+	if inpututil.IsKeyJustPressed(ebiten.Key1) {
+		g.drawMode = "rabbit"
+		log.Println("Draw mode: RABBIT (click to place rabbits)")
+	}
+	if inpututil.IsKeyJustPressed(ebiten.Key2) {
+		g.drawMode = "fox"
+		log.Println("Draw mode: FOX (click to place foxes)")
+	}
+	if inpututil.IsKeyJustPressed(ebiten.Key0) {
+		g.drawMode = "none"
+		log.Println("Draw mode: NONE (normal simulation)")
+	}
+	
+	// Mouse drawing
+	g.handleMouseInput()
+	
 	// Mouse clicks for buttons
 	if inpututil.IsMouseButtonJustPressed(ebiten.MouseButtonLeft) {
 		x, y := ebiten.CursorPosition()
 		g.handleButtonClick(x, y)
+	}
+}
+
+// handleMouseInput handles mouse drawing of animals
+func (g *Game) handleMouseInput() {
+	if g.world == nil || g.drawMode == "none" {
+		return
+	}
+	
+	// Check if mouse is pressed
+	if ebiten.IsMouseButtonPressed(ebiten.MouseButtonLeft) {
+		if !g.mousePressed {
+			g.mousePressed = true
+			g.handleMouseDraw()
+		}
+	} else {
+		g.mousePressed = false
+	}
+}
+
+// handleMouseDraw places animals at mouse position
+func (g *Game) handleMouseDraw() {
+	x, y := ebiten.CursorPosition()
+	
+	// Only draw in the simulation area (not on UI or graph)
+	if y >= gameAreaHeight || x < 0 || x >= screenWidth {
+		return
+	}
+	
+	// Convert screen coordinates to grid coordinates
+	gridX := x / cellSize
+	gridY := y / cellSize
+	
+	// Check bounds
+	if gridX < 0 || gridX >= gridWidth || gridY < 0 || gridY >= gridHeight {
+		return
+	}
+	
+	pos := Position{gridX, gridY}
+	
+	// Check if position is already occupied by an animal
+	if g.world.Grid[gridX][gridY] == RabbitType || g.world.Grid[gridX][gridY] == FoxType {
+		return // Don't overwrite existing animals
+	}
+	
+	switch g.drawMode {
+	case "rabbit":
+		// Check population limit
+		if len(g.world.Rabbits) >= maxRabbits {
+			return
+		}
+		
+		// Create new rabbit
+		rabbit := &Rabbit{
+			Animal: Animal{
+				Position:    pos,
+				Energy:      80, // Start with good energy
+				ReproduceCD: 0,
+				Age:         0,
+			},
+			NewBorn: 60, // Show as yellow briefly
+		}
+		
+		g.world.Rabbits = append(g.world.Rabbits, rabbit)
+		g.world.Grid[gridX][gridY] = RabbitType
+		log.Printf("Placed rabbit at (%d,%d)", gridX, gridY)
+		
+	case "fox":
+		// Check population limit
+		if len(g.world.Foxes) >= maxFoxes {
+			return
+		}
+		
+		// Create new fox
+		fox := &Fox{
+			Animal: Animal{
+				Position:    pos,
+				Energy:      80, // Start with good energy
+				ReproduceCD: 0,
+				Age:         0,
+			},
+		}
+		
+		g.world.Foxes = append(g.world.Foxes, fox)
+		g.world.Grid[gridX][gridY] = FoxType
+		log.Printf("Placed fox at (%d,%d)", gridX, gridY)
 	}
 }
 
@@ -106,6 +218,7 @@ func (g *Game) handleButtonClick(x, y int) {
 		g.populationHistory = make([]PopulationData, 0, maxHistoryPoints)
 		g.recordPopulationData()
 		g.paused = false
+		g.drawMode = "none"
 		log.Println("Simulation reset")
 	}
 }
@@ -199,7 +312,9 @@ func (g *Game) Draw(screen *ebiten.Image) {
 			debugText += fmt.Sprintf("Avg Fox Energy: %d\n", avgFoxEnergy)
 		}
 		
-		debugText += "Controls: SPACE=Pause"
+		// Drawing mode info
+		debugText += fmt.Sprintf("Draw Mode: %s\n", strings.ToUpper(g.drawMode))
+		debugText += "Controls: SPACE=Pause 1=Rabbit 2=Fox 0=None"
 	}
 	
 	ebitenutil.DebugPrint(screen, debugText)
@@ -209,8 +324,47 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	ebitenutil.DebugPrintAt(screen, "PLAY", 630, 20)
 	ebitenutil.DebugPrintAt(screen, "RESET", 715, 20)
 	
+	// Draw cursor indicator in drawing mode
+	if g.drawMode != "none" {
+		g.drawCursor(screen)
+	}
+	
 	// Draw simple graph legend
 	ebitenutil.DebugPrintAt(screen, "■=Rabbits ♦=Foxes +=Grass", 30, 580)
+}
+
+// drawCursor shows what will be placed at mouse position
+func (g *Game) drawCursor(screen *ebiten.Image) {
+	x, y := ebiten.CursorPosition()
+	
+	// Only show cursor in simulation area
+	if y >= gameAreaHeight || x < 0 || x >= screenWidth {
+		return
+	}
+	
+	// Convert to grid position
+	gridX := x / cellSize
+	gridY := y / cellSize
+	
+	// Check bounds
+	if gridX < 0 || gridX >= gridWidth || gridY < 0 || gridY >= gridHeight {
+		return
+	}
+	
+	// Draw preview at grid position
+	drawX := gridX * cellSize
+	drawY := gridY * cellSize
+	
+	var cursorColor color.RGBA
+	switch g.drawMode {
+	case "rabbit":
+		cursorColor = color.RGBA{255, 255, 255, 128} // Semi-transparent white
+	case "fox":
+		cursorColor = color.RGBA{255, 0, 0, 128} // Semi-transparent red
+	}
+	
+	// Draw preview rectangle
+	g.fillRect(screen, drawX+1, drawY+1, cellSize-2, cellSize-2, cursorColor)
 }
 
 // drawControlButtons draws pause/play/reset buttons
