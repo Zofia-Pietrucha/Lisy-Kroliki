@@ -1,3 +1,5 @@
+// Package main implements an ecosystem simulation with grass, rabbits, and foxes.
+// The simulation demonstrates predator-prey dynamics and natural population cycles.
 package main
 
 import (
@@ -13,24 +15,26 @@ import (
 
 // Game represents the main game state
 type Game struct {
-	world *World
-	slowMode bool  // Slower simulation
-	tickCounter int // Count frames to slow down updates
+	world       *World
+	slowMode    bool // Slower simulation for better observation
+	tickCounter int  // Count frames to slow down updates to 6 FPS
 }
 
 // Update proceeds the game state.
+// Called 60 times per second, but world updates only every 10 frames (6 FPS).
 func (g *Game) Update() error {
 	if g.world == nil {
 		g.world = NewWorld()
 		rand.Seed(time.Now().UnixNano())
 		
-		// Add some test entities to see rendering
+		// Add initial entities to start the simulation
 		g.world.addTestEntities()
 		
 		log.Println("World initialized with test entities")
 	}
 	
 	// Slow down simulation - update world only every 10 frames (6 FPS instead of 60)
+	// This makes the simulation easier to observe and follow
 	g.tickCounter++
 	if g.tickCounter >= 10 {
 		g.tickCounter = 0
@@ -41,23 +45,24 @@ func (g *Game) Update() error {
 	return nil
 }
 
-// Draw draws the game screen.
+// Draw renders the game screen.
+// Called every frame (60 FPS) for smooth visual updates.
 func (g *Game) Draw(screen *ebiten.Image) {
-	// Wypełnij tło czarnym kolorem (ziemia bez trawy)
-	screen.Fill(color.RGBA{0, 0, 0, 255}) // Black
+	// Fill background with black (empty ground)
+	screen.Fill(color.RGBA{0, 0, 0, 255})
 	
-	// Draw world grid
+	// Render the world grid with all entities
 	if g.world != nil {
 		g.drawWorld(screen)
 	}
 	
-	// Debug info
+	// Display simulation statistics
 	debugText := "Ecosystem Simulation\n"
 	if g.world != nil {
 		debugText += fmt.Sprintf("Tick: %d\n", g.world.Tick)
 		debugText += fmt.Sprintf("Grass patches: %d\n", len(g.world.Grass))
 		
-		// Rabbit info with population limit warning
+		// Rabbit population with limit warning
 		rabbitCount := len(g.world.Rabbits)
 		debugText += fmt.Sprintf("Rabbits: %d", rabbitCount)
 		if rabbitCount >= maxRabbits {
@@ -65,7 +70,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 		}
 		debugText += "\n"
 		
-		// Fox info with population limit warning  
+		// Fox population with limit warning
 		foxCount := len(g.world.Foxes)
 		debugText += fmt.Sprintf("Foxes: %d", foxCount)
 		if foxCount >= maxFoxes {
@@ -73,7 +78,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 		}
 		debugText += "\n"
 		
-		// Show rabbit reproduction status
+		// Detailed rabbit statistics
 		if len(g.world.Rabbits) > 0 {
 			readyToReproduce := 0
 			totalEnergy := 0
@@ -88,7 +93,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 			debugText += fmt.Sprintf("Rabbits ready to breed: %d\n", readyToReproduce)
 		}
 		
-		// Show fox status
+		// Fox energy statistics
 		if len(g.world.Foxes) > 0 {
 			totalFoxEnergy := 0
 			for _, f := range g.world.Foxes {
@@ -102,18 +107,22 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	ebitenutil.DebugPrint(screen, debugText)
 }
 
-// Layout takes the outside size (e.g., the window size) and returns the (logical) screen size.
+// Layout defines the logical screen size.
+// Returns the game's internal resolution regardless of window size.
 func (g *Game) Layout(outsideWidth, outsideHeight int) (int, int) {
 	return screenWidth, screenHeight
 }
 
+// main initializes and runs the ecosystem simulation.
 func main() {
 	log.Println("Starting Ecosystem Simulation...")
 	
+	// Configure the game window
 	ebiten.SetWindowSize(screenWidth, screenHeight)
-	ebiten.SetWindowTitle("Ecosystem Simulation")
+	ebiten.SetWindowTitle("Ecosystem Simulation - Grass, Rabbits, and Foxes")
 	ebiten.SetWindowResizingMode(ebiten.WindowResizingModeEnabled)
 	
+	// Create and run the game
 	game := &Game{}
 	
 	if err := ebiten.RunGame(game); err != nil {
