@@ -4,9 +4,12 @@ package main
 
 import (
 	"fmt"
+	"image"
 	"image/color"
+	"image/jpeg"
 	"log"
 	"math/rand"
+	"os"
 	"strings"
 	"time"
 
@@ -99,6 +102,11 @@ func (g *Game) handleInput() {
 	if inpututil.IsKeyJustPressed(ebiten.Key0) {
 		g.drawMode = "none"
 		log.Println("Draw mode: NONE (normal simulation)")
+	}
+	
+	// S key to save/export data manually
+	if inpututil.IsKeyJustPressed(ebiten.KeyS) {
+		g.saveSimulationData()
 	}
 	
 	// Mouse drawing
@@ -221,6 +229,330 @@ func (g *Game) handleButtonClick(x, y int) {
 		g.drawMode = "none"
 		log.Println("Simulation reset")
 	}
+	
+	// Save button (520, 50, 160, 30) - wider button below pause/play
+	if x >= 520 && x <= 680 && y >= 50 && y <= 80 {
+		g.saveSimulationData()
+	}
+}
+
+// saveSimulationData saves both CSV data and JPG screenshot
+func (g *Game) saveSimulationData() {
+	timestamp := time.Now().Format("2006-01-02_15-04-05")
+	
+	// Save CSV data
+	if len(g.populationHistory) > 0 {
+		exportPopulationData(g.populationHistory)
+	}
+	
+	// Save current screenshot
+	g.saveScreenshot(timestamp)
+	
+	// Save complete history as image sequence
+	g.saveHistorySequence(timestamp)
+	
+	log.Printf("Saved simulation data with timestamp: %s", timestamp)
+}
+
+// saveHistorySequence creates images for each point in population history
+func (g *Game) saveHistorySequence(timestamp string) {
+	if len(g.populationHistory) < 2 {
+		log.Println("Not enough history data for sequence")
+		return
+	}
+	
+	log.Printf("Creating history sequence with %d frames...", len(g.populationHistory))
+	
+	// Create directory for sequence
+	sequenceDir := fmt.Sprintf("ecosystem_sequence_%s", timestamp)
+	err := os.Mkdir(sequenceDir, 0755)
+	if err != nil {
+		log.Printf("Error creating sequence directory: %v", err)
+		return
+	}
+	
+	// Create temporary world state for rendering each frame
+	originalHistory := make([]PopulationData, len(g.populationHistory))
+	copy(originalHistory, g.populationHistory)
+	
+	// Generate each frame
+	for i := 0; i < len(originalHistory); i++ {
+		// Create history up to this point
+		currentHistory := originalHistory[:i+1]
+		
+		// Create frame
+		filename := fmt.Sprintf("%s/frame_%03d.jpg", sequenceDir, i)
+		g.saveHistoryFrame(filename, currentHistory, originalHistory[i])
+		
+		// Progress indicator
+		if i%10 == 0 || i == len(originalHistory)-1 {
+			log.Printf("Generated frame %d/%d", i+1, len(originalHistory))
+		}
+	}
+	
+	// Create summary file with instructions
+	g.createSequenceSummary(sequenceDir, timestamp, len(originalHistory))
+	
+	log.Printf("History sequence saved to: %s", sequenceDir)
+}
+
+// saveHistoryFrame saves a single frame of the history sequence
+func (g *Game) saveHistoryFrame(filename string, historyUpToPoint []PopulationData, currentData PopulationData) {
+	// Create image
+	bounds := image.Rect(0, 0, screenWidth, screenHeight)
+	img := image.NewRGBA(bounds)
+	
+	// Create temporary screen
+	screen := ebiten.NewImage(screenWidth, screenHeight)
+	
+	// Render frame
+	g.renderHistoryFrame(screen, historyUpToPoint, currentData)
+	
+	// Copy pixels
+	for y := 0; y < screenHeight; y++ {
+		for x := 0; x < screenWidth; x++ {
+			r, g, b, a := screen.At(x, y).RGBA()
+			img.Set(x, y, color.RGBA{
+				uint8(r >> 8),
+				uint8(g >> 8),
+				uint8(b >> 8),
+				uint8(a >> 8),
+			})
+		}
+	}
+	
+	// Save file
+	file, err := os.Create(filename)
+	if err != nil {
+		log.Printf("Error creating frame file: %v", err)
+		return
+	}
+	defer file.Close()
+	
+	err = jpeg.Encode(file, img, &jpeg.Options{Quality: 80})
+	if err != nil {
+		log.Printf("Error saving frame: %v", err)
+	}
+}
+
+// renderHistoryFrame renders a single frame showing history up to a specific point
+func (g *Game) renderHistoryFrame(screen *ebiten.Image, historyUpToPoint []PopulationData, currentData PopulationData) {
+	// Fill background
+	screen.Fill(color.RGBA{0, 0, 0, 255})
+	
+	// Draw graph area
+	g.fillRect(screen, graphOffsetX, graphOffsetY, graphWidth, graphHeight, color.RGBA{20, 20, 20, 255})
+	
+	// Draw border
+	g.fillRect(screen, graphOffsetX, graphOffsetY, graphWidth, 2, color.RGBA{100, 100, 100, 255})
+	g.fillRect(screen, graphOffsetX, graphOffsetY+graphHeight-2, graphWidth, 2, color.RGBA{100, 100, 100, 255})
+	g.fillRect(screen, graphOffsetX, graphOffsetY, 2, graphHeight, color.RGBA{100, 100, 100, 255})
+	g.fillRect(screen, graphOffsetX+graphWidth-2, graphOffsetY, 2, graphHeight, color.RGBA{100, 100, 100, 255})
+	
+	if len(historyUpToPoint) < 1 {
+		return
+	}
+	
+	// Calculate scale
+	maxValue := 20
+	for _, data := range historyUpToPoint {
+		if data.Rabbits > maxValue { maxValue = data.Rabbits }
+		if data.Foxes > maxValue { maxValue = data.Foxes }
+		if data.Grass/10 > maxValue { maxValue = data.Grass/10 }
+	}
+	
+	// Draw population points up to current point
+	g.drawHistoryPoints(screen, historyUpToPoint, "rabbits", maxValue, color.RGBA{255, 255, 255, 255})
+	g.drawHistoryPoints(screen, historyUpToPoint, "foxes", maxValue, color.RGBA{255, 0, 0, 255})
+	g.drawHistoryPoints(screen, historyUpToPoint, "grass", maxValue, color.RGBA{0, 255, 0, 255})
+	
+	// Add title and current stats
+	title := fmt.Sprintf("Ecosystem Evolution - Tick: %d (Frame %d)", currentData.Tick, len(historyUpToPoint))
+	ebitenutil.DebugPrint(screen, title)
+	
+	// Current population stats
+	stats := fmt.Sprintf("Current: Rabbits=%d  Foxes=%d  Grass=%d", 
+		currentData.Rabbits, currentData.Foxes, currentData.Grass)
+	ebitenutil.DebugPrintAt(screen, stats, 10, 30)
+	
+	// Legend
+	ebitenutil.DebugPrintAt(screen, "■=Rabbits ♦=Foxes +=Grass", 30, screenHeight-20)
+	
+	// Progress bar
+	progressWidth := 200
+	progressX := screenWidth - progressWidth - 20
+	progressY := 10
+	progress := float64(len(historyUpToPoint)) / float64(maxHistoryPoints)
+	
+	// Progress bar background
+	g.fillRect(screen, progressX, progressY, progressWidth, 10, color.RGBA{50, 50, 50, 255})
+	// Progress bar fill
+	g.fillRect(screen, progressX, progressY, int(float64(progressWidth)*progress), 10, color.RGBA{0, 150, 0, 255})
+}
+
+// drawHistoryPoints draws points for a specific population type in history frame
+func (g *Game) drawHistoryPoints(screen *ebiten.Image, history []PopulationData, populationType string, maxValue int, pointColor color.RGBA) {
+	if len(history) < 1 || maxValue <= 0 {
+		return
+	}
+	
+	var yOffset int
+	switch populationType {
+	case "rabbits": yOffset = 0
+	case "foxes": yOffset = -3  
+	case "grass": yOffset = 3
+	}
+	
+	for i, data := range history {
+		var value int
+		switch populationType {
+		case "rabbits": value = data.Rabbits
+		case "foxes": value = data.Foxes
+		case "grass": value = data.Grass / 10
+		default: continue
+		}
+		
+		if value == 0 { continue }
+		
+		// Calculate position (spread across full width)
+		x := graphOffsetX + 5 + ((i * (graphWidth - 10)) / maxHistoryPoints)
+		y := graphOffsetY + graphHeight - 5 - ((value * (graphHeight - 10)) / maxValue) + yOffset
+		
+		// Clamp y
+		if y < graphOffsetY + 5 { y = graphOffsetY + 5 }
+		if y > graphOffsetY + graphHeight - 5 { y = graphOffsetY + graphHeight - 5 }
+		
+		// Draw point with different shapes
+		switch populationType {
+		case "rabbits":
+			g.fillRect(screen, x-1, y-1, 3, 3, pointColor)
+		case "foxes":
+			g.fillRect(screen, x, y-1, 1, 1, pointColor)
+			g.fillRect(screen, x-1, y, 1, 1, pointColor)
+			g.fillRect(screen, x+1, y, 1, 1, pointColor)
+			g.fillRect(screen, x, y+1, 1, 1, pointColor)
+		case "grass":
+			g.fillRect(screen, x-1, y, 3, 1, pointColor)
+			g.fillRect(screen, x, y-1, 1, 3, pointColor)
+		}
+	}
+}
+
+// createSequenceSummary creates a text file with information about the sequence
+func (g *Game) createSequenceSummary(sequenceDir, timestamp string, frameCount int) {
+	summaryFile := fmt.Sprintf("%s/README.txt", sequenceDir)
+	file, err := os.Create(summaryFile)
+	if err != nil {
+		log.Printf("Error creating summary file: %v", err)
+		return
+	}
+	defer file.Close()
+	
+	summary := fmt.Sprintf(`Ecosystem Simulation History Sequence
+=====================================
+
+Generated: %s
+Frames: %d
+Duration: %d ticks
+Frame rate: One frame per 5 seconds of simulation
+
+Files:
+- frame_000.jpg to frame_%03d.jpg: Individual frames showing population evolution
+- README.txt: This file
+
+To create a video from these frames, you can use tools like:
+
+FFmpeg (example):
+ffmpeg -framerate 10 -i frame_%%03d.jpg -c:v libx264 -pix_fmt yuv420p ecosystem_evolution.mp4
+
+VirtualDub, Adobe Premiere, or other video editing software can also be used.
+
+Each frame shows:
+- Population graph growing over time
+- Current population numbers
+- Progress bar showing simulation progress
+- Legend for graph symbols
+
+This sequence captures the complete evolution of your ecosystem simulation!
+`, time.Now().Format("2006-01-02 15:04:05"), frameCount, 
+   g.populationHistory[len(g.populationHistory)-1].Tick, frameCount-1)
+	
+	file.WriteString(summary)
+	log.Printf("Created sequence summary: %s", summaryFile)
+}
+
+// saveScreenshot captures and saves the current game screen as JPG
+func (g *Game) saveScreenshot(timestamp string) {
+	// Create a new image to capture the screen
+	bounds := image.Rect(0, 0, screenWidth, screenHeight)
+	img := image.NewRGBA(bounds)
+	
+	// Create a temporary screen image
+	screen := ebiten.NewImage(screenWidth, screenHeight)
+	
+	// Render the game to the temporary screen
+	g.renderToImage(screen)
+	
+	// Read pixels from the screen
+	for y := 0; y < screenHeight; y++ {
+		for x := 0; x < screenWidth; x++ {
+			r, g, b, a := screen.At(x, y).RGBA()
+			img.Set(x, y, color.RGBA{
+				uint8(r >> 8),
+				uint8(g >> 8), 
+				uint8(b >> 8),
+				uint8(a >> 8),
+			})
+		}
+	}
+	
+	// Create file
+	filename := fmt.Sprintf("ecosystem_screenshot_%s.jpg", timestamp)
+	file, err := os.Create(filename)
+	if err != nil {
+		log.Printf("Error creating screenshot file: %v", err)
+		return
+	}
+	defer file.Close()
+	
+	// Save as JPEG
+	err = jpeg.Encode(file, img, &jpeg.Options{Quality: 90})
+	if err != nil {
+		log.Printf("Error saving screenshot: %v", err)
+		return
+	}
+	
+	log.Printf("Screenshot saved: %s", filename)
+}
+
+// renderToImage renders the game state to an image (without UI elements)
+func (g *Game) renderToImage(screen *ebiten.Image) {
+	// Fill background with black
+	screen.Fill(color.RGBA{0, 0, 0, 255})
+	
+	// Draw simulation area
+	if g.world != nil {
+		g.drawWorld(screen)
+	}
+	
+	// Draw population graph
+	if g.world != nil {
+		g.drawPopulationGraph(screen)
+	}
+	
+	// Add title and basic info (without debug details)
+	title := fmt.Sprintf("Ecosystem Simulation - Tick: %d", g.world.Tick)
+	if g.paused {
+		title += " (PAUSED)"
+	}
+	ebitenutil.DebugPrint(screen, title)
+	
+	// Add population info at bottom
+	if g.world != nil {
+		info := fmt.Sprintf("Rabbits: %d  Foxes: %d  Grass: %d", 
+			len(g.world.Rabbits), len(g.world.Foxes), len(g.world.Grass))
+		ebitenutil.DebugPrintAt(screen, info, 10, screenHeight-20)
+	}
 }
 
 // recordPopulationData adds current population counts to history
@@ -314,7 +646,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 		
 		// Drawing mode info
 		debugText += fmt.Sprintf("Draw Mode: %s\n", strings.ToUpper(g.drawMode))
-		debugText += "Controls: SPACE=Pause 1=Rabbit 2=Fox 0=None"
+		debugText += "Controls: SPACE=Pause 1=Rabbit 2=Fox 0=None S=Save+Screenshot"
 	}
 	
 	ebitenutil.DebugPrint(screen, debugText)
@@ -323,6 +655,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	ebitenutil.DebugPrintAt(screen, "PAUSE", 535, 20)
 	ebitenutil.DebugPrintAt(screen, "PLAY", 630, 20)
 	ebitenutil.DebugPrintAt(screen, "RESET", 715, 20)
+	ebitenutil.DebugPrintAt(screen, "SAVE DATA + SCREENSHOT", 535, 60)
 	
 	// Draw cursor indicator in drawing mode
 	if g.drawMode != "none" {
@@ -385,6 +718,9 @@ func (g *Game) drawControlButtons(screen *ebiten.Image) {
 	
 	// Reset button
 	g.fillRect(screen, 700, 10, 80, 30, color.RGBA{100, 100, 200, 255})
+	
+	// Save button (new, wider button below the others)
+	g.fillRect(screen, 520, 50, 160, 30, color.RGBA{200, 200, 100, 255}) // Yellow
 }
 
 // Layout defines the logical screen size.
@@ -405,7 +741,92 @@ func main() {
 	// Create and run the game
 	game := &Game{}
 	
+	// Defer function to export data when program exits
+	defer func() {
+		if game.world != nil && len(game.populationHistory) > 5 { // Only if we have meaningful data
+			timestamp := time.Now().Format("2006-01-02_15-04-05")
+			
+			log.Println("Saving final simulation data...")
+			exportPopulationData(game.populationHistory)
+			
+			log.Println("Creating complete history sequence...")
+			game.saveHistorySequence(timestamp)
+			
+			log.Println("Simulation data export complete!")
+		}
+	}()
+	
 	if err := ebiten.RunGame(game); err != nil {
 		log.Fatal(err)
+	}
+}
+
+// exportPopulationData saves population history to CSV file
+func exportPopulationData(history []PopulationData) {
+	// Generate filename with timestamp
+	timestamp := time.Now().Format("2006-01-02_15-04-05")
+	filename := fmt.Sprintf("ecosystem_data_%s.csv", timestamp)
+	
+	// Create file
+	file, err := os.Create(filename)
+	if err != nil {
+		log.Printf("Error creating CSV file: %v", err)
+		return
+	}
+	defer file.Close()
+	
+	// Write file header with simulation info
+	file.WriteString("# Ecosystem Simulation Data Export\n")
+	file.WriteString(fmt.Sprintf("# Generated: %s\n", time.Now().Format("2006-01-02 15:04:05")))
+	file.WriteString(fmt.Sprintf("# Duration: %d ticks (%d data points)\n", history[len(history)-1].Tick, len(history)))
+	file.WriteString(fmt.Sprintf("# Data recorded every 5 seconds (30 ticks)\n"))
+	file.WriteString("# \n")
+	file.WriteString("# Simulation parameters:\n")
+	file.WriteString(fmt.Sprintf("# - Grid size: %dx%d\n", gridWidth, gridHeight))
+	file.WriteString(fmt.Sprintf("# - Max rabbits: %d\n", maxRabbits))
+	file.WriteString(fmt.Sprintf("# - Max foxes: %d\n", maxFoxes))
+	file.WriteString(fmt.Sprintf("# - Grass growth rate: %d per tick\n", grassGrowthRate))
+	file.WriteString(fmt.Sprintf("# - Grass spawn chance: %.3f per tick\n", grassSpawnChance))
+	file.WriteString("# \n")
+	
+	// Write CSV header
+	_, err = file.WriteString("Tick,Rabbits,Foxes,Grass,Timestamp\n")
+	if err != nil {
+		log.Printf("Error writing CSV header: %v", err)
+		return
+	}
+	
+	// Write data rows
+	startTime := time.Now().Add(-time.Duration(len(history)) * 5 * time.Second) // Approximate start time
+	for i, data := range history {
+		rowTime := startTime.Add(time.Duration(i) * 5 * time.Second) // 5 seconds between data points
+		line := fmt.Sprintf("%d,%d,%d,%d,%s\n", 
+			data.Tick, 
+			data.Rabbits, 
+			data.Foxes, 
+			data.Grass,
+			rowTime.Format("15:04:05"))
+		
+		_, err = file.WriteString(line)
+		if err != nil {
+			log.Printf("Error writing CSV data: %v", err)
+			return
+		}
+	}
+	
+	log.Printf("Population data exported to: %s", filename)
+	log.Printf("Exported %d data points covering %d ticks", len(history), history[len(history)-1].Tick)
+	
+	// Calculate and log some statistics
+	if len(history) > 1 {
+		maxRabbits := 0
+		maxFoxes := 0
+		maxGrass := 0
+		for _, data := range history {
+			if data.Rabbits > maxRabbits { maxRabbits = data.Rabbits }
+			if data.Foxes > maxFoxes { maxFoxes = data.Foxes }
+			if data.Grass > maxGrass { maxGrass = data.Grass }
+		}
+		log.Printf("Peak populations: Rabbits=%d, Foxes=%d, Grass=%d", maxRabbits, maxFoxes, maxGrass)
 	}
 }
