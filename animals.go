@@ -247,9 +247,13 @@ func (w *World) updateFoxes() {
 		// Try to hunt rabbit at current position first
 		w.foxHuntRabbit(fox)
 		
-		// Move fox (actively hunt - prefer moving toward rabbits)
+		// Move fox with smart hunting if enabled
 		if rand.Float64() < foxMoveChance {
-			w.moveFoxHunting(fox)
+			if w.smartHunting {
+				w.moveFoxSmart(fox)
+			} else {
+				w.moveFoxHunting(fox) // Use old hunting method
+			}
 			// Try to hunt at new position too
 			w.foxHuntRabbit(fox)
 		}
@@ -266,6 +270,110 @@ func (w *World) updateFoxes() {
 			w.removeFox(i)
 		}
 	}
+}
+
+// moveFoxSmart uses enhanced vision to hunt rabbits more effectively
+func (w *World) moveFoxSmart(fox *Fox) {
+	// Clear current position
+	w.Grid[fox.Animal.Position.X][fox.Animal.Position.Y] = Empty
+	
+	// Look for rabbits in vision range
+	targetRabbit := w.findNearestRabbit(fox.Animal.Position)
+	
+	var newPos Position
+	if targetRabbit != nil {
+		// Move towards the nearest rabbit
+		newPos = w.moveTowardsTarget(fox.Animal.Position, *targetRabbit)
+		log.Printf("Fox at (%d,%d) spotted rabbit at (%d,%d), moving towards it", 
+			fox.Animal.Position.X, fox.Animal.Position.Y, targetRabbit.X, targetRabbit.Y)
+	} else {
+		// No rabbits in sight, move randomly
+		moves := w.getAdjacentPositions(fox.Animal.Position)
+		validMoves := make([]Position, 0)
+		for _, pos := range moves {
+			cellType := w.Grid[pos.X][pos.Y]
+			if cellType == Empty || cellType == GrassType || cellType == RabbitType {
+				validMoves = append(validMoves, pos)
+			}
+		}
+		
+		if len(validMoves) > 0 {
+			newPos = validMoves[rand.Intn(len(validMoves))]
+		} else {
+			newPos = fox.Animal.Position // Stay in place
+		}
+	}
+	
+	fox.Animal.Position = newPos
+	w.Grid[fox.Animal.Position.X][fox.Animal.Position.Y] = FoxType
+}
+
+// findNearestRabbit looks for rabbits within fox vision range
+func (w *World) findNearestRabbit(foxPos Position) *Position {
+	var nearestRabbit *Position
+	minDistance := foxVisionRange + 1
+	
+	// Search in vision range around fox
+	for dx := -foxVisionRange; dx <= foxVisionRange; dx++ {
+		for dy := -foxVisionRange; dy <= foxVisionRange; dy++ {
+			if dx == 0 && dy == 0 {
+				continue // Skip fox's current position
+			}
+			
+			x := foxPos.X + dx
+			y := foxPos.Y + dy
+			
+			// Check bounds
+			if x < 0 || x >= gridWidth || y < 0 || y >= gridHeight {
+				continue
+			}
+			
+			// Check if there's a rabbit at this position
+			if w.Grid[x][y] == RabbitType {
+				// Calculate distance (Manhattan distance)
+				distance := abs(dx) + abs(dy)
+				if distance < minDistance {
+					minDistance = distance
+					pos := Position{x, y}
+					nearestRabbit = &pos
+				}
+			}
+		}
+	}
+	
+	return nearestRabbit
+}
+
+// moveTowardsTarget calculates the best move towards a target position
+func (w *World) moveTowardsTarget(current, target Position) Position {
+	// Get all possible moves
+	moves := w.getAdjacentPositions(current)
+	
+	var bestMove Position = current // Default: stay in place
+	bestDistance := abs(current.X - target.X) + abs(current.Y - target.Y)
+	
+	// Find the move that gets closest to target
+	for _, move := range moves {
+		cellType := w.Grid[move.X][move.Y]
+		// Can move to empty, grass, or rabbit positions
+		if cellType == Empty || cellType == GrassType || cellType == RabbitType {
+			distance := abs(move.X - target.X) + abs(move.Y - target.Y)
+			if distance < bestDistance {
+				bestDistance = distance
+				bestMove = move
+			}
+		}
+	}
+	
+	return bestMove
+}
+
+// abs returns absolute value of an integer
+func abs(x int) int {
+	if x < 0 {
+		return -x
+	}
+	return x
 }
 
 // moveFoxHunting moves fox, preferring positions with rabbits nearby

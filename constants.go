@@ -34,10 +34,14 @@ const (
 	reproduceChance          = 0.3 // Chance to try reproduction each tick
 
 	// Fox parameters
-	foxMoveChance         = 0.6 // Chance fox moves each tick (zwiększone z 0.4)
+	foxMoveChance         = 0.6 // Chance fox moves each tick
 	foxEnergyLoss         = 1   // Energy lost per tick every 60 ticks
 	rabbitEnergyGain      = 50  // Energy gained from eating rabbit
-	foxReproduceThreshold = 70  // Min energy for fox reproduction (zmniejszone z 80)
+	foxReproduceThreshold = 70  // Min energy for fox reproduction
+
+	// Fox vision parameters
+	foxVisionRange  = 3    // How many cells fox can see in each direction
+	foxSmartHunting = true // Whether foxes use smart hunting AI
 
 	// Population limits (prevent overpopulation)
 	maxRabbits = 50 // Maximum rabbit population

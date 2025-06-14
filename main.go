@@ -104,6 +104,12 @@ func (g *Game) handleInput() {
 		log.Println("Draw mode: NONE (normal simulation)")
 	}
 	
+	// V key to toggle fox vision mode
+	if inpututil.IsKeyJustPressed(ebiten.KeyV) {
+		// We need to access the constants, so we'll toggle it through a global variable
+		g.toggleFoxVision()
+	}
+	
 	// S key to save/export data manually
 	if inpututil.IsKeyJustPressed(ebiten.KeyS) {
 		g.saveSimulationData()
@@ -236,7 +242,20 @@ func (g *Game) handleButtonClick(x, y int) {
 	}
 }
 
-// saveSimulationData saves both CSV data and JPG screenshot
+// toggleFoxVision switches between smart and basic fox hunting
+func (g *Game) toggleFoxVision() {
+	// We need to modify constants, but Go doesn't allow changing const values
+	// So we'll add this info to debug display and change the behavior through a game variable
+	if g.world != nil {
+		// Toggle smart hunting (we'll use a world property)
+		g.world.smartHunting = !g.world.smartHunting
+		if g.world.smartHunting {
+			log.Printf("Fox vision: ENHANCED (range %d cells)", foxVisionRange)
+		} else {
+			log.Println("Fox vision: BASIC (1 cell)")
+		}
+	}
+}
 func (g *Game) saveSimulationData() {
 	timestamp := time.Now().Format("2006-01-02_15-04-05")
 	
@@ -646,7 +665,15 @@ func (g *Game) Draw(screen *ebiten.Image) {
 		
 		// Drawing mode info
 		debugText += fmt.Sprintf("Draw Mode: %s\n", strings.ToUpper(g.drawMode))
-		debugText += "Controls: SPACE=Pause 1=Rabbit 2=Fox 0=None S=Save+Screenshot"
+		
+		// Fox vision info
+		if g.world.smartHunting {
+			debugText += fmt.Sprintf("Fox Vision: ENHANCED (%d cells)\n", foxVisionRange)
+		} else {
+			debugText += "Fox Vision: BASIC (1 cell)\n"
+		}
+		
+		debugText += "Controls: SPACE=Pause 1=Rabbit 2=Fox 0=None V=Vision S=Save"
 	}
 	
 	ebitenutil.DebugPrint(screen, debugText)

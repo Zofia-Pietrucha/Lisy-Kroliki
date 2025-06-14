@@ -9,6 +9,7 @@ type World struct {
 	Rabbits []*Rabbit
 	Foxes   []*Fox
 	Tick    int
+	smartHunting bool // Whether foxes use enhanced vision
 }
 
 // NewWorld creates a new world
@@ -19,6 +20,7 @@ func NewWorld() *World {
 		Rabbits: make([]*Rabbit, 0),
 		Foxes:   make([]*Fox, 0),
 		Tick:    0,
+		smartHunting: foxSmartHunting, // Initialize with default value
 	}
 	
 	// Initialize grid
