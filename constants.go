@@ -7,6 +7,16 @@ const (
 	gridHeight   = 60
 	cellSize     = 10
 
+	// UI layout
+	gameAreaHeight = 400 // Upper area for simulation
+	graphHeight    = 150 // Lower area for graph
+	graphWidth     = 750 // Graph width
+	graphOffsetX   = 25  // Graph left margin
+	graphOffsetY   = 420 // Graph top position
+
+	// Graph settings
+	maxHistoryPoints = 150 // How many data points to keep
+
 	// Grass parameters
 	maxGrassAmount   = 100
 	grassGrowthRate  = 2    // How much grass grows per tick
@@ -47,4 +57,12 @@ const (
 // Position represents coordinates on the grid
 type Position struct {
 	X, Y int
+}
+
+// PopulationData represents population counts at a specific time
+type PopulationData struct {
+	Tick    int
+	Rabbits int
+	Foxes   int
+	Grass   int
 }

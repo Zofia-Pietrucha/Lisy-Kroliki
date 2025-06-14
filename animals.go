@@ -416,6 +416,9 @@ func (w *World) findFoxAtPosition(pos Position) *Fox {
 func (w *World) removeFox(index int) {
 	fox := w.Foxes[index]
 	
+	// Log fox death for debugging
+	log.Printf("Fox died at (%d,%d) with energy %d! Foxes left: %d", fox.Animal.Position.X, fox.Animal.Position.Y, fox.Animal.Energy, len(w.Foxes)-1)
+	
 	// Clear grid position
 	w.Grid[fox.Animal.Position.X][fox.Animal.Position.Y] = Empty
 	
