@@ -30,4 +30,8 @@ go build -ldflags="-s -w" -o ecosystem-sim-optimized main.go
 - [x] System świata i entity
 - [x] Renderowanie
 - [x] System trawy (wzrost i pojawianie się)
-- [ ] Logika zwierząt
+- [x] Króliki z podstawowym ruchem
+- [ ] Króliki jedzą trawę
+- [ ] Rozmnażanie królików
+- [ ] Lisy i polowanie
+- [ ] System śmierci

@@ -22,6 +22,10 @@ const (
 	maxGrassAmount    = 100
 	grassGrowthRate   = 2    // How much grass grows per tick
 	grassSpawnChance  = 0.01 // Chance for new grass to appear on empty cells
+	
+	// Rabbit parameters
+	rabbitMoveChance = 0.3   // Chance rabbit moves each tick
+	rabbitEnergyLoss = 1     // Energy lost per tick
 )
 
 // Entity types
@@ -91,6 +95,7 @@ func NewWorld() *World {
 // Update updates the world state
 func (w *World) Update() {
 	w.updateGrass()
+	w.updateRabbits()
 }
 
 // updateGrass handles grass growth and spawning
@@ -123,6 +128,88 @@ func (w *World) updateGrass() {
 			}
 		}
 	}
+}
+
+// updateRabbits handles rabbit movement and aging
+func (w *World) updateRabbits() {
+	for i := len(w.Rabbits) - 1; i >= 0; i-- {
+		rabbit := w.Rabbits[i]
+		
+		// Age and lose energy
+		rabbit.Age++
+		rabbit.Energy -= rabbitEnergyLoss
+		
+		// Move rabbit randomly
+		if rand.Float64() < rabbitMoveChance {
+			w.moveRabbit(rabbit)
+		}
+		
+		// Check if rabbit dies
+		if rabbit.Energy <= 0 {
+			w.removeRabbit(i)
+		}
+	}
+}
+
+// moveRabbit moves a rabbit to a random adjacent position
+func (w *World) moveRabbit(rabbit *Rabbit) {
+	// Clear current position
+	w.Grid[rabbit.Position.X][rabbit.Position.Y] = Empty
+	
+	// Get possible moves (adjacent cells)
+	moves := w.getAdjacentPositions(rabbit.Position)
+	
+	// Filter for empty positions or grass positions
+	validMoves := make([]Position, 0)
+	for _, pos := range moves {
+		cellType := w.Grid[pos.X][pos.Y]
+		if cellType == Empty || cellType == GrassType {
+			validMoves = append(validMoves, pos)
+		}
+	}
+	
+	// Move to random valid position, or stay if no valid moves
+	if len(validMoves) > 0 {
+		newPos := validMoves[rand.Intn(len(validMoves))]
+		rabbit.Position = newPos
+	}
+	
+	// Update grid with new position
+	w.Grid[rabbit.Position.X][rabbit.Position.Y] = RabbitType
+}
+
+// getAdjacentPositions returns valid adjacent positions (8-directional)
+func (w *World) getAdjacentPositions(pos Position) []Position {
+	adjacent := make([]Position, 0, 8)
+	
+	for dx := -1; dx <= 1; dx++ {
+		for dy := -1; dy <= 1; dy++ {
+			if dx == 0 && dy == 0 {
+				continue // Skip current position
+			}
+			
+			newX := pos.X + dx
+			newY := pos.Y + dy
+			
+			// Check bounds
+			if newX >= 0 && newX < gridWidth && newY >= 0 && newY < gridHeight {
+				adjacent = append(adjacent, Position{newX, newY})
+			}
+		}
+	}
+	
+	return adjacent
+}
+
+// removeRabbit removes a rabbit from the world
+func (w *World) removeRabbit(index int) {
+	rabbit := w.Rabbits[index]
+	
+	// Clear grid position
+	w.Grid[rabbit.Position.X][rabbit.Position.Y] = Empty
+	
+	// Remove from slice
+	w.Rabbits = append(w.Rabbits[:index], w.Rabbits[index+1:]...)
 }
 
 // Game represents the main game state
@@ -218,7 +305,13 @@ func (g *Game) Draw(screen *ebiten.Image) {
 		debugText += fmt.Sprintf("Tick: %d\n", g.world.Tick)
 		debugText += fmt.Sprintf("Grass patches: %d\n", len(g.world.Grass))
 		debugText += fmt.Sprintf("Rabbits: %d\n", len(g.world.Rabbits))
-		debugText += fmt.Sprintf("Foxes: %d", len(g.world.Foxes))
+		debugText += fmt.Sprintf("Foxes: %d\n", len(g.world.Foxes))
+		
+		// Show first rabbit info if any
+		if len(g.world.Rabbits) > 0 {
+			r := g.world.Rabbits[0]
+			debugText += fmt.Sprintf("Rabbit0: E=%d A=%d", r.Energy, r.Age)
+		}
 	}
 	
 	ebitenutil.DebugPrint(screen, debugText)
