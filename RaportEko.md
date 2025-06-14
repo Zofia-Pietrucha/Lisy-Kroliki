@@ -302,12 +302,29 @@ Początkowo króliki i lisy pojawiały się losowo, ale potem dodałam grupowani
 4. **Genetyka** - szybsze króliki, lepsze lisy
 5. **Więcej gatunków** - ptaki, owady, rośliny
 
+## Jak uruchomić symulację
+
+### Wymagania
+
+Żeby uruchomić program, potrzebujesz:
+- Go w wersji 1.21 lub nowszej (ja używałam 1.24)
+- Linux (projekt był testowany pod Linuxem, zgodnie z wymaganiami)
+- Biblioteki systemowe dla Ebiten (zazwyczaj są już zainstalowane)
+
+### Uruchamianie
+
+```bash
+# Najpierw pobierz zależności
+go mod download
+
+# Uruchom symulację
+go run .
+```
+
 ## Podsumowanie
 
 Ten projekt był naprawdę fajny! Na początku wydawał się prosty, ale każdy szczegół okazał się ważny. Najbardziej podobało mi się obserwowanie, jak symulacja "żyje" - czasem byłam w stanie przewidzieć co się stanie (np. że za chwilę będzie kryzys królików), a czasem mnie zaskakiwała.
 
 Największą satysfakcją było zobaczenie pierwszych prawidłowych cykli populacyjnych jak w naturze.
-
-
 
 **P.S.** Gdyby chciał Pan pobawić się parametrami to można je łatwo zmienić w `constants.go` i obserwować jak to wpływa na symulację!
