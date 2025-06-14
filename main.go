@@ -24,8 +24,10 @@ const (
 	grassSpawnChance  = 0.01 // Chance for new grass to appear on empty cells
 	
 	// Rabbit parameters
-	rabbitMoveChance = 0.3   // Chance rabbit moves each tick
-	rabbitEnergyLoss = 1     // Energy lost per tick
+	rabbitMoveChance = 0.5   // Chance rabbit moves each tick (zwiększone - szybsze poszukiwanie)
+	rabbitEnergyLoss = 1     // Energy lost per tick every 60 ticks (co sekundę)
+	grassEnergyGain  = 40    // Energy gained from eating grass (dużo więcej)
+	minGrassToEat    = 5     // Minimum grass amount to be edible (bardzo niskie)
 )
 
 // Entity types
@@ -135,19 +137,48 @@ func (w *World) updateRabbits() {
 	for i := len(w.Rabbits) - 1; i >= 0; i-- {
 		rabbit := w.Rabbits[i]
 		
-		// Age and lose energy
+		// Age
 		rabbit.Age++
-		rabbit.Energy -= rabbitEnergyLoss
+		
+		// Lose energy only every 60 ticks (roughly once per second)
+		if w.Tick%60 == 0 {
+			rabbit.Energy -= rabbitEnergyLoss
+		}
+		
+		// Try to eat grass at current position
+		w.rabbitEatGrass(rabbit)
 		
 		// Move rabbit randomly
 		if rand.Float64() < rabbitMoveChance {
 			w.moveRabbit(rabbit)
+			// Try to eat grass at new position too
+			w.rabbitEatGrass(rabbit)
 		}
 		
 		// Check if rabbit dies
 		if rabbit.Energy <= 0 {
 			w.removeRabbit(i)
 		}
+	}
+}
+
+// rabbitEatGrass makes rabbit eat grass at its current position
+func (w *World) rabbitEatGrass(rabbit *Rabbit) {
+	pos := rabbit.Position
+	grass, exists := w.Grass[pos]
+	
+	if exists && grass.Amount >= minGrassToEat {
+		// Rabbit eats the grass
+		rabbit.Energy += grassEnergyGain
+		
+		// Cap energy at reasonable level
+		if rabbit.Energy > 100 {
+			rabbit.Energy = 100
+		}
+		
+		// Remove grass completely (rabbit ate it all)
+		delete(w.Grass, pos)
+		// Don't update grid here - let moveRabbit handle it properly
 	}
 }
 
@@ -237,21 +268,21 @@ func (g *Game) Update() error {
 
 // addTestEntities adds some test entities for visualization
 func (g *Game) addTestEntities() {
-	// Add some grass patches (mniej niż wcześniej)
-	for i := 0; i < 10; i++ {
+	// Add some grass patches (więcej trawy)
+	for i := 0; i < 30; i++ {
 		x := rand.Intn(gridWidth)
 		y := rand.Intn(gridHeight)
 		pos := Position{x, y}
 		
 		g.world.Grass[pos] = &Grass{
 			Position: pos,
-			Amount:   rand.Intn(51) + 25, // 25-75 (średnio rozwiniętą trawę)
+			Amount:   rand.Intn(51) + 50, // 50-100 (dojrzała trawa)
 		}
 		g.world.Grid[x][y] = GrassType
 	}
 	
 	// Add some rabbits
-	for i := 0; i < 3; i++ {
+	for i := 0; i < 5; i++ {
 		x := rand.Intn(gridWidth)
 		y := rand.Intn(gridHeight)
 		
@@ -259,7 +290,7 @@ func (g *Game) addTestEntities() {
 		if g.world.Grid[x][y] == Empty {
 			rabbit := &Rabbit{
 				Position: Position{x, y},
-				Energy:   50,
+				Energy:   80, // Start with more energy
 				ReproduceCD: 0,
 				Age:      0,
 			}
@@ -307,10 +338,14 @@ func (g *Game) Draw(screen *ebiten.Image) {
 		debugText += fmt.Sprintf("Rabbits: %d\n", len(g.world.Rabbits))
 		debugText += fmt.Sprintf("Foxes: %d\n", len(g.world.Foxes))
 		
-		// Show first rabbit info if any
+		// Show average rabbit energy
 		if len(g.world.Rabbits) > 0 {
-			r := g.world.Rabbits[0]
-			debugText += fmt.Sprintf("Rabbit0: E=%d A=%d", r.Energy, r.Age)
+			totalEnergy := 0
+			for _, r := range g.world.Rabbits {
+				totalEnergy += r.Energy
+			}
+			avgEnergy := totalEnergy / len(g.world.Rabbits)
+			debugText += fmt.Sprintf("Avg Rabbit Energy: %d", avgEnergy)
 		}
 	}
 	
@@ -319,17 +354,16 @@ func (g *Game) Draw(screen *ebiten.Image) {
 
 // drawWorld renders the world grid
 func (g *Game) drawWorld(screen *ebiten.Image) {
-	// Draw grass
+	// First draw grass (bottom layer)
 	for pos, grass := range g.world.Grass {
 		g.drawGrass(screen, pos, grass.Amount)
 	}
 	
-	// Draw rabbits
+	// Then draw animals on top
 	for _, rabbit := range g.world.Rabbits {
 		g.drawRabbit(screen, rabbit.Position)
 	}
 	
-	// Draw foxes
 	for _, fox := range g.world.Foxes {
 		g.drawFox(screen, fox.Position)
 	}
@@ -348,13 +382,14 @@ func (g *Game) drawGrass(screen *ebiten.Image, pos Position, amount int) {
 	g.fillRect(screen, x, y, cellSize, cellSize, grassColor)
 }
 
-// drawRabbit draws a rabbit (white dot)
+// drawRabbit draws a rabbit (smaller white dot so grass is visible underneath)
 func (g *Game) drawRabbit(screen *ebiten.Image, pos Position) {
 	x := pos.X * cellSize
 	y := pos.Y * cellSize
 	
 	rabbitColor := color.RGBA{255, 255, 255, 255} // White
-	g.fillRect(screen, x+2, y+2, cellSize-4, cellSize-4, rabbitColor)
+	// Smaller rabbit so we can see grass underneath
+	g.fillRect(screen, x+3, y+3, cellSize-6, cellSize-6, rabbitColor)
 }
 
 // drawFox draws a fox (red dot)

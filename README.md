@@ -31,7 +31,7 @@ go build -ldflags="-s -w" -o ecosystem-sim-optimized main.go
 - [x] Renderowanie
 - [x] System trawy (wzrost i pojawianie się)
 - [x] Króliki z podstawowym ruchem
-- [ ] Króliki jedzą trawę
+- [x] Króliki jedzą trawę
 - [ ] Rozmnażanie królików
 - [ ] Lisy i polowanie
 - [ ] System śmierci
