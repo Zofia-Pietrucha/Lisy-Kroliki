@@ -29,4 +29,5 @@ go build -ldflags="-s -w" -o ecosystem-sim-optimized main.go
 - [x] Podstawowe okno gry
 - [x] System świata i entity
 - [x] Renderowanie
-- [ ] Logika symulacji
+- [x] System trawy (wzrost i pojawianie się)
+- [ ] Logika zwierząt

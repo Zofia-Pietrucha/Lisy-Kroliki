@@ -17,6 +17,11 @@ const (
 	gridWidth    = 80
 	gridHeight   = 60
 	cellSize     = 10
+	
+	// Grass parameters
+	maxGrassAmount    = 100
+	grassGrowthRate   = 2    // How much grass grows per tick
+	grassSpawnChance  = 0.01 // Chance for new grass to appear on empty cells
 )
 
 // Entity types
@@ -83,6 +88,43 @@ func NewWorld() *World {
 	return w
 }
 
+// Update updates the world state
+func (w *World) Update() {
+	w.updateGrass()
+}
+
+// updateGrass handles grass growth and spawning
+func (w *World) updateGrass() {
+	// Grow existing grass
+	for _, grass := range w.Grass {
+		if grass.Amount < maxGrassAmount {
+			grass.Amount += grassGrowthRate
+			if grass.Amount > maxGrassAmount {
+				grass.Amount = maxGrassAmount
+			}
+		}
+	}
+	
+	// Try to spawn new grass on empty cells
+	for attempts := 0; attempts < 10; attempts++ {
+		x := rand.Intn(gridWidth)
+		y := rand.Intn(gridHeight)
+		
+		// Check if cell is empty
+		if w.Grid[x][y] == Empty {
+			// Random chance to spawn grass
+			if rand.Float64() < grassSpawnChance {
+				pos := Position{x, y}
+				w.Grass[pos] = &Grass{
+					Position: pos,
+					Amount:   grassGrowthRate, // Start with small amount
+				}
+				w.Grid[x][y] = GrassType
+			}
+		}
+	}
+}
+
 // Game represents the main game state
 type Game struct {
 	world *World
@@ -100,39 +142,44 @@ func (g *Game) Update() error {
 		log.Println("World initialized with test entities")
 	}
 	
+	// Update world every tick
+	g.world.Update()
 	g.world.Tick++
 	return nil
 }
 
 // addTestEntities adds some test entities for visualization
 func (g *Game) addTestEntities() {
-	// Add some grass patches
-	for i := 0; i < 20; i++ {
+	// Add some grass patches (mniej niż wcześniej)
+	for i := 0; i < 10; i++ {
 		x := rand.Intn(gridWidth)
 		y := rand.Intn(gridHeight)
 		pos := Position{x, y}
 		
 		g.world.Grass[pos] = &Grass{
 			Position: pos,
-			Amount:   rand.Intn(101), // 0-100
+			Amount:   rand.Intn(51) + 25, // 25-75 (średnio rozwiniętą trawę)
 		}
 		g.world.Grid[x][y] = GrassType
 	}
 	
 	// Add some rabbits
-	for i := 0; i < 5; i++ {
+	for i := 0; i < 3; i++ {
 		x := rand.Intn(gridWidth)
 		y := rand.Intn(gridHeight)
 		
-		rabbit := &Rabbit{
-			Position: Position{x, y},
-			Energy:   50,
-			ReproduceCD: 0,
-			Age:      0,
+		// Make sure position is not occupied
+		if g.world.Grid[x][y] == Empty {
+			rabbit := &Rabbit{
+				Position: Position{x, y},
+				Energy:   50,
+				ReproduceCD: 0,
+				Age:      0,
+			}
+			
+			g.world.Rabbits = append(g.world.Rabbits, rabbit)
+			g.world.Grid[x][y] = RabbitType
 		}
-		
-		g.world.Rabbits = append(g.world.Rabbits, rabbit)
-		g.world.Grid[x][y] = RabbitType
 	}
 	
 	// Add some foxes
@@ -140,15 +187,18 @@ func (g *Game) addTestEntities() {
 		x := rand.Intn(gridWidth)
 		y := rand.Intn(gridHeight)
 		
-		fox := &Fox{
-			Position: Position{x, y},
-			Energy:   50,
-			ReproduceCD: 0,
-			Age:      0,
+		// Make sure position is not occupied
+		if g.world.Grid[x][y] == Empty {
+			fox := &Fox{
+				Position: Position{x, y},
+				Energy:   50,
+				ReproduceCD: 0,
+				Age:      0,
+			}
+			
+			g.world.Foxes = append(g.world.Foxes, fox)
+			g.world.Grid[x][y] = FoxType
 		}
-		
-		g.world.Foxes = append(g.world.Foxes, fox)
-		g.world.Grid[x][y] = FoxType
 	}
 }
 
