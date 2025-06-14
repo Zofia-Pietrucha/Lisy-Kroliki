@@ -22,6 +22,12 @@ const (
 	reproduceEnergyThreshold = 60  // Min energy to reproduce
 	reproductionCooldown     = 180 // Ticks before can reproduce again
 	reproduceChance          = 0.3 // Chance to try reproduction each tick
+
+	// Fox parameters
+	foxMoveChance         = 0.6 // Chance fox moves each tick (zwiększone z 0.4)
+	foxEnergyLoss         = 1   // Energy lost per tick every 60 ticks
+	rabbitEnergyGain      = 50  // Energy gained from eating rabbit
+	foxReproduceThreshold = 70  // Min energy for fox reproduction (zmniejszone z 80)
 )
 
 // Entity types

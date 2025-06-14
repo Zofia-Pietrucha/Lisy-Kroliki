@@ -222,3 +222,193 @@ func (w *World) removeRabbit(index int) {
 	// Remove from slice
 	w.Rabbits = append(w.Rabbits[:index], w.Rabbits[index+1:]...)
 }
+
+// updateFoxes handles fox movement, hunting and aging
+func (w *World) updateFoxes() {
+	for i := len(w.Foxes) - 1; i >= 0; i-- {
+		fox := w.Foxes[i]
+		
+		// Age and reduce reproduction cooldown
+		fox.Animal.Age++
+		if fox.Animal.ReproduceCD > 0 {
+			fox.Animal.ReproduceCD--
+		}
+		
+		// Lose energy only every 60 ticks
+		if w.Tick%60 == 0 {
+			fox.Animal.Energy -= foxEnergyLoss
+		}
+		
+		// Try to hunt rabbit at current position first
+		w.foxHuntRabbit(fox)
+		
+		// Move fox (actively hunt - prefer moving toward rabbits)
+		if rand.Float64() < foxMoveChance {
+			w.moveFoxHunting(fox)
+			// Try to hunt at new position too
+			w.foxHuntRabbit(fox)
+		}
+		
+		// Try reproduction if well-fed
+		if fox.Animal.Energy >= foxReproduceThreshold && fox.Animal.ReproduceCD == 0 {
+			if rand.Float64() < reproduceChance*1.5 { // Foxes reproduce easier
+				w.tryFoxReproduction(fox)
+			}
+		}
+		
+		// Check if fox dies
+		if fox.Animal.Energy <= 0 {
+			w.removeFox(i)
+		}
+	}
+}
+
+// moveFoxHunting moves fox, preferring positions with rabbits nearby
+func (w *World) moveFoxHunting(fox *Fox) {
+	// Clear current position
+	w.Grid[fox.Animal.Position.X][fox.Animal.Position.Y] = Empty
+	
+	// Get possible moves (adjacent cells)
+	moves := w.getAdjacentPositions(fox.Animal.Position)
+	
+	// Separate moves into: rabbit positions and other valid positions
+	rabbitMoves := make([]Position, 0)
+	validMoves := make([]Position, 0)
+	
+	for _, pos := range moves {
+		cellType := w.Grid[pos.X][pos.Y]
+		if cellType == RabbitType {
+			rabbitMoves = append(rabbitMoves, pos)
+		} else if cellType == Empty || cellType == GrassType {
+			validMoves = append(validMoves, pos)
+		}
+	}
+	
+	// Prefer moving to rabbit positions (hunting!)
+	if len(rabbitMoves) > 0 {
+		newPos := rabbitMoves[rand.Intn(len(rabbitMoves))]
+		fox.Animal.Position = newPos
+	} else if len(validMoves) > 0 {
+		// No rabbits nearby, move randomly
+		newPos := validMoves[rand.Intn(len(validMoves))]
+		fox.Animal.Position = newPos
+	}
+	// If no valid moves, stay in place
+	
+	// Update grid with new position
+	w.Grid[fox.Animal.Position.X][fox.Animal.Position.Y] = FoxType
+}
+
+// foxHuntRabbit makes fox hunt rabbit at its current position
+func (w *World) foxHuntRabbit(fox *Fox) {
+	pos := fox.Animal.Position
+	
+	// Look for rabbit at this position
+	for i, rabbit := range w.Rabbits {
+		if rabbit.Animal.Position.X == pos.X && rabbit.Animal.Position.Y == pos.Y {
+			// Fox catches rabbit!
+			fox.Animal.Energy += rabbitEnergyGain
+			
+			// Cap energy
+			if fox.Animal.Energy > 150 {
+				fox.Animal.Energy = 150
+			}
+			
+			// Remove rabbit
+			w.removeRabbit(i)
+			
+			log.Printf("Fox hunted rabbit at (%d,%d)! Rabbits left: %d", pos.X, pos.Y, len(w.Rabbits))
+			return
+		}
+	}
+}
+
+// moveFox moves a fox to a random adjacent position
+func (w *World) moveFox(fox *Fox) {
+	// Clear current position
+	w.Grid[fox.Animal.Position.X][fox.Animal.Position.Y] = Empty
+	
+	// Get possible moves (adjacent cells)
+	moves := w.getAdjacentPositions(fox.Animal.Position)
+	
+	// Filter for empty positions, grass positions, or rabbit positions (can hunt)
+	validMoves := make([]Position, 0)
+	for _, pos := range moves {
+		cellType := w.Grid[pos.X][pos.Y]
+		if cellType == Empty || cellType == GrassType || cellType == RabbitType {
+			validMoves = append(validMoves, pos)
+		}
+	}
+	
+	// Move to random valid position, or stay if no valid moves
+	if len(validMoves) > 0 {
+		newPos := validMoves[rand.Intn(len(validMoves))]
+		fox.Animal.Position = newPos
+	}
+	
+	// Update grid with new position
+	w.Grid[fox.Animal.Position.X][fox.Animal.Position.Y] = FoxType
+}
+
+// tryFoxReproduction attempts fox reproduction with nearby fox
+func (w *World) tryFoxReproduction(fox *Fox) {
+	adjacentPositions := w.getAdjacentPositions(fox.Animal.Position)
+	
+	for _, pos := range adjacentPositions {
+		if w.Grid[pos.X][pos.Y] == FoxType {
+			partner := w.findFoxAtPosition(pos)
+			if partner != nil && 
+			   partner.Animal.Energy >= foxReproduceThreshold && 
+			   partner.Animal.ReproduceCD == 0 {
+				
+				// Find empty position for baby fox
+				for _, babyPos := range w.getAdjacentPositions(fox.Animal.Position) {
+					if w.Grid[babyPos.X][babyPos.Y] == Empty {
+						// Create baby fox
+						baby := &Fox{
+							Animal: Animal{
+								Position:    babyPos,
+								Energy:      60,
+								ReproduceCD: reproductionCooldown,
+								Age:         0,
+							},
+						}
+						
+						w.Foxes = append(w.Foxes, baby)
+						w.Grid[babyPos.X][babyPos.Y] = FoxType
+						
+						// Parents lose energy and get cooldown
+						fox.Animal.Energy -= 30
+						partner.Animal.Energy -= 30
+						fox.Animal.ReproduceCD = reproductionCooldown
+						partner.Animal.ReproduceCD = reproductionCooldown
+						
+						log.Printf("New fox born at (%d,%d)! Total foxes: %d", babyPos.X, babyPos.Y, len(w.Foxes))
+						return
+					}
+				}
+			}
+		}
+	}
+}
+
+// findFoxAtPosition finds fox at given position
+func (w *World) findFoxAtPosition(pos Position) *Fox {
+	for _, fox := range w.Foxes {
+		if fox.Animal.Position.X == pos.X && fox.Animal.Position.Y == pos.Y {
+			return fox
+		}
+	}
+	return nil
+}
+
+// removeFox removes a fox from the world
+func (w *World) removeFox(index int) {
+	fox := w.Foxes[index]
+	
+	// Clear grid position
+	w.Grid[fox.Animal.Position.X][fox.Animal.Position.Y] = Empty
+	
+	// Remove from slice
+	w.Foxes = append(w.Foxes[:index], w.Foxes[index+1:]...)
+}

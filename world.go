@@ -33,6 +33,7 @@ func NewWorld() *World {
 func (w *World) Update() {
 	w.updateGrass()
 	w.updateRabbits()
+	w.updateFoxes()
 }
 
 // getAdjacentPositions returns valid adjacent positions (8-directional)
@@ -102,24 +103,31 @@ func (w *World) addTestEntities() {
 		}
 	}
 	
-	// Add some foxes
-	for i := 0; i < 2; i++ {
-		x := rand.Intn(gridWidth)
-		y := rand.Intn(gridHeight)
+	// Add some foxes (w grupach jak króliki)
+	for group := 0; group < 2; group++ {
+		// Random center for fox group
+		centerX := rand.Intn(gridWidth-6) + 3
+		centerY := rand.Intn(gridHeight-6) + 3
 		
-		// Make sure position is not occupied
-		if w.Grid[x][y] == Empty {
-			fox := &Fox{
-				Animal: Animal{
-					Position:    Position{x, y},
-					Energy:      50,
-					ReproduceCD: 0,
-					Age:         0,
-				},
-			}
+		// Add 2-3 foxes around this center  
+		for i := 0; i < 2+rand.Intn(2); i++ {
+			x := centerX + rand.Intn(4) - 2 // Within 2 cells of center
+			y := centerY + rand.Intn(4) - 2
 			
-			w.Foxes = append(w.Foxes, fox)
-			w.Grid[x][y] = FoxType
+			// Make sure within bounds and not occupied
+			if x >= 0 && x < gridWidth && y >= 0 && y < gridHeight && w.Grid[x][y] == Empty {
+				fox := &Fox{
+					Animal: Animal{
+						Position:    Position{x, y},
+						Energy:      80, // Start with high energy (ready to reproduce)
+						ReproduceCD: 0,
+						Age:         0,
+					},
+				}
+				
+				w.Foxes = append(w.Foxes, fox)
+				w.Grid[x][y] = FoxType
+			}
 		}
 	}
 }

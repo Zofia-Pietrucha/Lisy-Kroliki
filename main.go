@@ -70,8 +70,18 @@ func (g *Game) Draw(screen *ebiten.Image) {
 				}
 			}
 			avgEnergy := totalEnergy / len(g.world.Rabbits)
-			debugText += fmt.Sprintf("Avg Energy: %d\n", avgEnergy)
-			debugText += fmt.Sprintf("Ready to breed: %d", readyToReproduce)
+			debugText += fmt.Sprintf("Rabbit Avg Energy: %d\n", avgEnergy)
+			debugText += fmt.Sprintf("Rabbits ready to breed: %d\n", readyToReproduce)
+		}
+		
+		// Show fox status
+		if len(g.world.Foxes) > 0 {
+			totalFoxEnergy := 0
+			for _, f := range g.world.Foxes {
+				totalFoxEnergy += f.Animal.Energy
+			}
+			avgFoxEnergy := totalFoxEnergy / len(g.world.Foxes)
+			debugText += fmt.Sprintf("Fox Avg Energy: %d", avgFoxEnergy)
 		}
 	}
 	
