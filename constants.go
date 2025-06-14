@@ -28,6 +28,10 @@ const (
 	foxEnergyLoss         = 1   // Energy lost per tick every 60 ticks
 	rabbitEnergyGain      = 50  // Energy gained from eating rabbit
 	foxReproduceThreshold = 70  // Min energy for fox reproduction (zmniejszone z 80)
+
+	// Population limits (prevent overpopulation)
+	maxRabbits = 50 // Maximum rabbit population
+	maxFoxes   = 15 // Maximum fox population
 )
 
 // Entity types

@@ -56,8 +56,22 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	if g.world != nil {
 		debugText += fmt.Sprintf("Tick: %d\n", g.world.Tick)
 		debugText += fmt.Sprintf("Grass patches: %d\n", len(g.world.Grass))
-		debugText += fmt.Sprintf("Rabbits: %d\n", len(g.world.Rabbits))
-		debugText += fmt.Sprintf("Foxes: %d\n", len(g.world.Foxes))
+		
+		// Rabbit info with population limit warning
+		rabbitCount := len(g.world.Rabbits)
+		debugText += fmt.Sprintf("Rabbits: %d", rabbitCount)
+		if rabbitCount >= maxRabbits {
+			debugText += " (MAX!)"
+		}
+		debugText += "\n"
+		
+		// Fox info with population limit warning  
+		foxCount := len(g.world.Foxes)
+		debugText += fmt.Sprintf("Foxes: %d", foxCount)
+		if foxCount >= maxFoxes {
+			debugText += " (MAX!)"
+		}
+		debugText += "\n"
 		
 		// Show rabbit reproduction status
 		if len(g.world.Rabbits) > 0 {

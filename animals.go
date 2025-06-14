@@ -179,6 +179,11 @@ func (w *World) findRabbitAtPosition(pos Position) *Rabbit {
 
 // createBabyRabbit creates new rabbit from two parents
 func (w *World) createBabyRabbit(parent1, parent2 *Rabbit) {
+	// Check population limit
+	if len(w.Rabbits) >= maxRabbits {
+		return // Too many rabbits already
+	}
+	
 	// Find empty adjacent position for baby
 	adjacentPositions := w.getAdjacentPositions(parent1.Animal.Position)
 	
@@ -352,6 +357,11 @@ func (w *World) moveFox(fox *Fox) {
 
 // tryFoxReproduction attempts fox reproduction with nearby fox
 func (w *World) tryFoxReproduction(fox *Fox) {
+	// Check population limit
+	if len(w.Foxes) >= maxFoxes {
+		return // Too many foxes already
+	}
+	
 	adjacentPositions := w.getAdjacentPositions(fox.Animal.Position)
 	
 	for _, pos := range adjacentPositions {

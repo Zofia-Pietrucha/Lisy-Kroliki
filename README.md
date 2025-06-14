@@ -33,5 +33,7 @@ go build -ldflags="-s -w" -o ecosystem-sim-optimized main.go
 - [x] Króliki z podstawowym ruchem
 - [x] Króliki jedzą trawę
 - [x] Rozmnażanie królików
-- [ ] Lisy i polowanie
-- [ ] System śmierci
+- [x] Refactoring na Animal + Rabbit/Fox struktury
+- [x] Lisy i polowanie
+- [x] Balansowanie ekosystemu
+- [ ] Optymalizacja i finalne dopracowanie
