@@ -34,7 +34,6 @@ func (w *World) Update() {
 	w.updateFoxes()
 }
 
-// getAdjacentPositions returns valid adjacent positions (8-directional)
 func (w *World) getAdjacentPositions(pos Position) []Position {
 	adjacent := make([]Position, 0, 8)
 	
@@ -57,7 +56,6 @@ func (w *World) getAdjacentPositions(pos Position) []Position {
 }
 
 func (w *World) addTestEntities() {
-	// Add grass patches
 	for i := 0; i < 30; i++ {
 		x := rand.Intn(gridWidth)
 		y := rand.Intn(gridHeight)
@@ -70,7 +68,6 @@ func (w *World) addTestEntities() {
 		w.Grid[x][y] = GrassType
 	}
 	
-	// Add rabbit groups
 	for group := 0; group < 3; group++ {
 		centerX := rand.Intn(gridWidth-10) + 5
 		centerY := rand.Intn(gridHeight-10) + 5
@@ -96,7 +93,6 @@ func (w *World) addTestEntities() {
 		}
 	}
 	
-	// Add fox groups
 	for group := 0; group < 2; group++ {
 		centerX := rand.Intn(gridWidth-6) + 3
 		centerY := rand.Intn(gridHeight-6) + 3

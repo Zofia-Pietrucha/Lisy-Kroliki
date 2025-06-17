@@ -1,0 +1,15 @@
+# Ecosystem Simulation Data Export
+# Generated: 2025-06-17 23:14:46
+# Duration: 6 ticks (2 data points)
+# Data recorded every 5 seconds (30 ticks)
+# 
+# Simulation parameters:
+# - Grid size: 80x60
+# - Max rabbits: 50
+# - Max foxes: 15
+# - Grass growth rate: 2 per tick
+# - Grass spawn chance: 0.010 per tick
+# 
+Tick,Rabbits,Foxes,Grass,Timestamp
+0,9,5,30,23:14:36
+6,10,6,30,23:14:41

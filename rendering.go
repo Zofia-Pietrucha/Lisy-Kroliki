@@ -7,14 +7,12 @@ import (
 )
 
 func (g *Game) drawWorld(screen *ebiten.Image) {
-	// Draw grass (bottom layer)
 	for pos, grass := range g.world.Grass {
 		if pos.Y * cellSize < gameAreaHeight {
 			g.drawGrass(screen, pos, grass.Amount)
 		}
 	}
 	
-	// Draw animals on top
 	for _, rabbit := range g.world.Rabbits {
 		if rabbit.Animal.Position.Y * cellSize < gameAreaHeight {
 			g.drawRabbit(screen, rabbit.Animal.Position)
@@ -66,7 +64,6 @@ func (g *Game) drawRabbitInArea(screen *ebiten.Image, pos Position) {
 		rabbitColor = color.RGBA{255, 255, 255, 255} // White
 	}
 	
-	// Smaller rabbit so we can see grass underneath
 	g.fillRectInArea(screen, x+3, y+3, cellSize-6, cellSize-6, rabbitColor)
 }
 
@@ -159,7 +156,6 @@ func (g *Game) drawLine(screen *ebiten.Image, x1, y1, x2, y2 int, lineColor colo
 	}
 }
 
-// drawPopulationGraph renders the population history graph
 func (g *Game) drawPopulationGraph(screen *ebiten.Image) {
 	if len(g.populationHistory) < 1 {
 		return
@@ -167,13 +163,11 @@ func (g *Game) drawPopulationGraph(screen *ebiten.Image) {
 	
 	g.fillRect(screen, graphOffsetX, graphOffsetY, graphWidth, graphHeight, color.RGBA{20, 20, 20, 255})
 	
-	// Draw border
 	g.fillRect(screen, graphOffsetX, graphOffsetY, graphWidth, 2, color.RGBA{100, 100, 100, 255})
 	g.fillRect(screen, graphOffsetX, graphOffsetY+graphHeight-2, graphWidth, 2, color.RGBA{100, 100, 100, 255})
 	g.fillRect(screen, graphOffsetX, graphOffsetY, 2, graphHeight, color.RGBA{100, 100, 100, 255})
 	g.fillRect(screen, graphOffsetX+graphWidth-2, graphOffsetY, 2, graphHeight, color.RGBA{100, 100, 100, 255})
 	
-	// Simplify data for performance
 	dataToUse := g.populationHistory
 	if len(dataToUse) > 50 {
 		step := len(dataToUse) / 50
@@ -188,7 +182,6 @@ func (g *Game) drawPopulationGraph(screen *ebiten.Image) {
 		return
 	}
 	
-	// Find max values for scaling
 	maxValue := 20
 	for _, data := range dataToUse {
 		if data.Rabbits > maxValue {
@@ -212,7 +205,6 @@ func (g *Game) drawPopulationPoints(screen *ebiten.Image, history []PopulationDa
 		return
 	}
 	
-	// Vertical offset to avoid overlap
 	var yOffset int
 	switch populationType {
 	case "rabbits":
@@ -253,7 +245,6 @@ func (g *Game) drawPopulationPoints(screen *ebiten.Image, history []PopulationDa
 			y = graphOffsetY + graphHeight - 5
 		}
 		
-		// Different shapes for different populations
 		switch populationType {
 		case "rabbits":
 			g.fillRect(screen, x-1, y-1, 3, 3, pointColor)

@@ -28,7 +28,6 @@ type Game struct {
 	mousePressed    bool
 }
 
-// Update proceeds the game state. Called 60 times per second, but world updates only every 10 frames (6 FPS).
 func (g *Game) Update() error {
 	if g.world == nil {
 		g.world = NewWorld()
@@ -48,14 +47,12 @@ func (g *Game) Update() error {
 	g.handleInput()
 	
 	if !g.paused {
-		// Update world only every 10 frames (6 FPS instead of 60)
 		g.tickCounter++
 		if g.tickCounter >= 10 {
 			g.tickCounter = 0
 			g.world.Update()
 			g.world.Tick++
 			
-			// Record population data every 30 ticks (once per 5 seconds)
 			g.recordCounter++
 			if g.recordCounter >= 30 {
 				g.recordCounter = 0
@@ -511,7 +508,6 @@ func (g *Game) recordPopulationData() {
 	}
 }
 
-// Draw renders the game screen. Called every frame (60 FPS) for smooth visual updates.
 func (g *Game) Draw(screen *ebiten.Image) {
 	screen.Fill(color.RGBA{0, 0, 0, 255})
 	
@@ -552,7 +548,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 		}
 		debugText += "\n"
 		
-		// Average energies to understand population dynamics
+		// Average energies
 		if rabbitCount > 0 {
 			totalRabbitEnergy := 0
 			for _, r := range g.world.Rabbits {

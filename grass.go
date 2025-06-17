@@ -8,7 +8,6 @@ type Grass struct {
 }
 
 func (w *World) updateGrass() {
-	// Grow existing grass
 	for _, grass := range w.Grass {
 		if grass.Amount < maxGrassAmount {
 			grass.Amount += grassGrowthRate
@@ -18,7 +17,6 @@ func (w *World) updateGrass() {
 		}
 	}
 	
-	// Try to spawn new grass on empty cells
 	for attempts := 0; attempts < 10; attempts++ {
 		x := rand.Intn(gridWidth)
 		y := rand.Intn(gridHeight)

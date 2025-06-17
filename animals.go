@@ -23,7 +23,6 @@ type Fox struct {
 }
 
 func (w *World) updateRabbits() {
-	// Handle all rabbit updates without reproduction
 	for i := len(w.Rabbits) - 1; i >= 0; i-- {
 		rabbit := w.Rabbits[i]
 		
@@ -36,7 +35,6 @@ func (w *World) updateRabbits() {
 			rabbit.NewBorn--
 		}
 		
-		// Lose energy only every 60 ticks (roughly once per second)
 		if w.Tick%60 == 0 {
 			rabbit.Animal.Energy -= rabbitEnergyLoss
 		}
@@ -53,7 +51,6 @@ func (w *World) updateRabbits() {
 		}
 	}
 	
-	// Handle reproduction in separate pass to avoid multiple births per tick
 	w.handleRabbitReproduction()
 }
 
@@ -162,7 +159,7 @@ func (w *World) createBabyRabbit(parent1, parent2 *Rabbit) {
 					ReproduceCD: reproductionCooldown,
 					Age:         0,
 				},
-				NewBorn: 180, // Visual indicator for 30 seconds (180 ticks at 6 FPS)
+				NewBorn: 180, // 30 seconds
 			}
 			
 			w.Rabbits = append(w.Rabbits, baby)
@@ -225,7 +222,6 @@ func (w *World) updateFoxes() {
 	}
 }
 
-// moveFoxSmart uses enhanced vision to hunt rabbits more effectively
 func (w *World) moveFoxSmart(fox *Fox) {
 	w.Grid[fox.Animal.Position.X][fox.Animal.Position.Y] = Empty
 	
@@ -257,7 +253,6 @@ func (w *World) moveFoxSmart(fox *Fox) {
 	w.Grid[fox.Animal.Position.X][fox.Animal.Position.Y] = FoxType
 }
 
-// findNearestRabbit looks for rabbits within fox vision range
 func (w *World) findNearestRabbit(foxPos Position) *Position {
 	var nearestRabbit *Position
 	minDistance := foxVisionRange + 1
@@ -289,7 +284,6 @@ func (w *World) findNearestRabbit(foxPos Position) *Position {
 	return nearestRabbit
 }
 
-// moveTowardsTarget calculates the best move towards a target position
 func (w *World) moveTowardsTarget(current, target Position) Position {
 	moves := w.getAdjacentPositions(current)
 	
